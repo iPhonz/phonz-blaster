@@ -65,11 +65,20 @@
         let lives = 3;
         let gameRunning = true;
         
+        // Create emoji sprites
+        const ninja = '🥷';
+        const coconut = '🥥';
+        const alien = '👽';
+        
+        // Set up sprite sizes
+        const SPRITE_SIZE = 40;
+        const BULLET_SIZE = 30;
+        
         let ship = {
             x: canvas.width / 2,
             y: canvas.height - 50,
-            width: 50,
-            height: 30,
+            width: SPRITE_SIZE,
+            height: SPRITE_SIZE,
             speed: 5,
             invulnerable: false,
             invulnerabilityTimer: 0
@@ -97,10 +106,10 @@
         document.addEventListener('keypress', (e) => {
             if (e.key === ' ' && gameRunning) {
                 bullets.push({
-                    x: ship.x + ship.width / 2,
+                    x: ship.x + ship.width / 2 - BULLET_SIZE / 2,
                     y: ship.y,
-                    width: 4,
-                    height: 10,
+                    width: BULLET_SIZE,
+                    height: BULLET_SIZE,
                     speed: 7
                 });
             }
@@ -109,10 +118,10 @@
         function spawnEnemy() {
             if (Math.random() < 0.02 && gameRunning) {
                 enemies.push({
-                    x: Math.random() * (canvas.width - 30),
+                    x: Math.random() * (canvas.width - SPRITE_SIZE),
                     y: 0,
-                    width: 30,
-                    height: 30,
+                    width: SPRITE_SIZE,
+                    height: SPRITE_SIZE,
                     speed: 2
                 });
             }
@@ -135,7 +144,6 @@
             enemies = enemies.filter(enemy => {
                 enemy.y += enemy.speed;
                 
-                // Check for collision with ship
                 if (!ship.invulnerable && 
                     enemy.x < ship.x + ship.width &&
                     enemy.x + enemy.width > ship.x &&
@@ -178,20 +186,24 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw ship
-            ctx.fillStyle = ship.invulnerable ? '#555' : '#0f0';
-            ctx.fillRect(ship.x, ship.y, ship.width, ship.height);
+            // Set font for emojis
+            ctx.font = `${SPRITE_SIZE}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             
-            // Draw bullets
-            ctx.fillStyle = '#fff';
+            // Draw ship (ninja)
+            if (!ship.invulnerable || Math.floor(Date.now() / 100) % 2) {
+                ctx.fillText(ninja, ship.x + ship.width/2, ship.y + ship.height/2);
+            }
+            
+            // Draw bullets (coconuts)
             bullets.forEach(bullet => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                ctx.fillText(coconut, bullet.x + bullet.width/2, bullet.y + bullet.height/2);
             });
             
-            // Draw enemies
-            ctx.fillStyle = '#f00';
+            // Draw enemies (aliens)
             enemies.forEach(enemy => {
-                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+                ctx.fillText(alien, enemy.x + enemy.width/2, enemy.y + enemy.height/2);
             });
         }
         
