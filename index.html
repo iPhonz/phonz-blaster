@@ -65,33 +65,94 @@
         let lives = 3;
         let gameRunning = true;
         
+        // Ship designs
+        const shipDesigns = [
+            {
+                color: '#4CAF50',
+                draw: (x, y) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x + 25, y);
+                    ctx.lineTo(x + 50, y + 30);
+                    ctx.lineTo(x + 25, y + 25);
+                    ctx.lineTo(x, y + 30);
+                    ctx.closePath();
+                    ctx.fillStyle = '#4CAF50';
+                    ctx.fill();
+                    ctx.strokeStyle = '#81C784';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            },
+            {
+                color: '#2196F3',
+                draw: (x, y) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x + 25, y);
+                    ctx.lineTo(x + 40, y + 20);
+                    ctx.lineTo(x + 25, y + 30);
+                    ctx.lineTo(x + 10, y + 20);
+                    ctx.closePath();
+                    ctx.fillStyle = '#2196F3';
+                    ctx.fill();
+                    ctx.strokeStyle = '#64B5F6';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+        ];
+
         let ship = {
-            x: canvas.width / 2,
+            x: canvas.width / 2 - 25,
             y: canvas.height - 50,
             width: 50,
             height: 30,
             speed: 5,
             invulnerable: false,
-            invulnerabilityTimer: 0
+            invulnerabilityTimer: 0,
+            design: shipDesigns[0]
         };
         
         let bullets = [];
         let enemies = [];
         let keys = {};
         
-        function restartGame() {
-            score = 0;
-            lives = 3;
-            gameRunning = true;
-            ship.x = canvas.width / 2;
-            ship.y = canvas.height - 50;
-            enemies = [];
-            bullets = [];
-            scoreElement.textContent = score;
-            livesElement.textContent = lives;
-            gameOverElement.style.display = 'none';
+        function drawBullet(bullet) {
+            switch(bullet.design) {
+                case 0:
+                    // Diamond
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x, bullet.y + bullet.height/2);
+                    ctx.lineTo(bullet.x + bullet.width/2, bullet.y);
+                    ctx.lineTo(bullet.x + bullet.width, bullet.y + bullet.height/2);
+                    ctx.lineTo(bullet.x + bullet.width/2, bullet.y + bullet.height);
+                    ctx.closePath();
+                    ctx.fillStyle = '#FF4081';
+                    ctx.fill();
+                    break;
+                case 1:
+                    // Star
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x + bullet.width/2, bullet.y);
+                    for (let i = 0; i < 5; i++) {
+                        ctx.lineTo(
+                            bullet.x + bullet.width/2 + Math.cos((i * 4 * Math.PI / 5) + Math.PI/2) * bullet.width/2,
+                            bullet.y + bullet.height/2 + Math.sin((i * 4 * Math.PI / 5) + Math.PI/2) * bullet.height/2
+                        );
+                    }
+                    ctx.closePath();
+                    ctx.fillStyle = '#7C4DFF';
+                    ctx.fill();
+                    break;
+                case 2:
+                    // Circle
+                    ctx.beginPath();
+                    ctx.arc(bullet.x + bullet.width/2, bullet.y + bullet.height/2, bullet.width/2, 0, Math.PI * 2);
+                    ctx.fillStyle = '#00BCD4';
+                    ctx.fill();
+                    break;
+            }
         }
-        
+
         document.addEventListener('keydown', (e) => keys[e.key] = true);
         document.addEventListener('keyup', (e) => keys[e.key] = false);
         document.addEventListener('keypress', (e) => {
@@ -99,24 +160,14 @@
                 bullets.push({
                     x: ship.x + ship.width / 2,
                     y: ship.y,
-                    width: 4,
-                    height: 10,
-                    speed: 7
+                    speedX: 0,
+                    speedY: -10,
+                    width: 8,
+                    height: 8,
+                    design: Math.floor(Math.random() * 3)
                 });
             }
         });
-        
-        function spawnEnemy() {
-            if (Math.random() < 0.02 && gameRunning) {
-                enemies.push({
-                    x: Math.random() * (canvas.width - 30),
-                    y: 0,
-                    width: 30,
-                    height: 30,
-                    speed: 2
-                });
-            }
-        }
         
         function moveShip() {
             if (!gameRunning) return;
@@ -126,71 +177,29 @@
         
         function updateBullets() {
             bullets = bullets.filter(bullet => {
-                bullet.y -= bullet.speed;
+                bullet.y += bullet.speedY;
+                bullet.x += bullet.speedX;
                 return bullet.y > 0;
             });
         }
-        
-        function updateEnemies() {
-            enemies = enemies.filter(enemy => {
-                enemy.y += enemy.speed;
-                
-                // Check for collision with ship
-                if (!ship.invulnerable && 
-                    enemy.x < ship.x + ship.width &&
-                    enemy.x + enemy.width > ship.x &&
-                    enemy.y < ship.y + ship.height &&
-                    enemy.y + enemy.height > ship.y) {
-                    lives--;
-                    livesElement.textContent = lives;
-                    ship.invulnerable = true;
-                    ship.invulnerabilityTimer = 60;
-                    
-                    if (lives <= 0) {
-                        gameRunning = false;
-                        gameOverElement.style.display = 'block';
-                        finalScoreElement.textContent = `Final Score: ${score}`;
-                    }
-                    return false;
-                }
-                
-                return enemy.y < canvas.height;
-            });
-        }
-        
-        function checkCollisions() {
-            bullets.forEach((bullet, bulletIndex) => {
-                enemies.forEach((enemy, enemyIndex) => {
-                    if (bullet.x < enemy.x + enemy.width &&
-                        bullet.x + bullet.width > enemy.x &&
-                        bullet.y < enemy.y + enemy.height &&
-                        bullet.y + bullet.height > enemy.y) {
-                        bullets.splice(bulletIndex, 1);
-                        enemies.splice(enemyIndex, 1);
-                        score += 10;
-                        scoreElement.textContent = score;
-                    }
-                });
-            });
-        }
-        
+
         function draw() {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Draw ship
-            ctx.fillStyle = ship.invulnerable ? '#555' : '#0f0';
-            ctx.fillRect(ship.x, ship.y, ship.width, ship.height);
+            if (!ship.invulnerable || Math.floor(Date.now() / 100) % 2) {
+                ship.design.draw(ship.x, ship.y);
+            }
             
             // Draw bullets
-            ctx.fillStyle = '#fff';
             bullets.forEach(bullet => {
-                ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+                drawBullet(bullet);
             });
             
             // Draw enemies
-            ctx.fillStyle = '#f00';
             enemies.forEach(enemy => {
+                ctx.fillStyle = '#f00';
                 ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
             });
         }
@@ -210,6 +219,19 @@
             checkCollisions();
             draw();
             requestAnimationFrame(gameLoop);
+        }
+        
+        function restartGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            ship.x = canvas.width / 2;
+            ship.y = canvas.height - 50;
+            enemies = [];
+            bullets = [];
+            scoreElement.textContent = score;
+            livesElement.textContent = lives;
+            gameOverElement.style.display = 'none';
         }
         
         gameLoop();
