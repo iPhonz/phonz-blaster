@@ -1,1 +1,245 @@
-function drawEnemy(enemy) {\n    ctx.save();\n    ctx.translate(enemy.x + enemy.width/2, enemy.y + enemy.height/2);\n    ctx.rotate(enemy.rotation);\n    \n    switch(enemy.design) {\n        case 0:\n            // UFO style\n            ctx.beginPath();\n            ctx.ellipse(0, 0, enemy.width/2, enemy.height/4, 0, 0, Math.PI * 2);\n            ctx.fillStyle = '#E91E63';\n            ctx.fill();\n            ctx.beginPath();\n            ctx.ellipse(0, -5, enemy.width/4, enemy.height/3, 0, 0, Math.PI);\n            ctx.fillStyle = '#880E4F';\n            ctx.fill();\n            break;\n        case 1:\n            // Crystal style\n            ctx.beginPath();\n            ctx.moveTo(-enemy.width/2, 0);\n            ctx.lineTo(0, -enemy.height/2);\n            ctx.lineTo(enemy.width/2, 0);\n            ctx.lineTo(0, enemy.height/2);\n            ctx.closePath();\n            ctx.fillStyle = '#9C27B0';\n            ctx.fill();\n            break;\n        case 2:\n            // Bio-mechanical style\n            ctx.beginPath();\n            ctx.arc(0, 0, enemy.width/3, 0, Math.PI * 2);\n            ctx.fillStyle = '#4CAF50';\n            ctx.fill();\n            for (let i = 0; i < 6; i++) {\n                const angle = (i / 6) * Math.PI * 2;\n                ctx.beginPath();\n                ctx.moveTo(0, 0);\n                ctx.lineTo(\n                    Math.cos(angle) * enemy.width/2,\n                    Math.sin(angle) * enemy.height/2\n                );\n                ctx.strokeStyle = '#81C784';\n                ctx.lineWidth = 2;\n                ctx.stroke();\n            }\n            break;\n    }\n    \n    ctx.restore();\n}\n\nfunction spawnEnemy() {\n    if (Math.random() < 0.02 && gameRunning) {\n        enemies.push({\n            x: Math.random() * (canvas.width - 40),\n            y: 0,\n            width: 40,\n            height: 40,\n            speed: 2,\n            rotation: 0,\n            rotationSpeed: (Math.random() - 0.5) * 0.1,\n            design: Math.floor(Math.random() * 3),\n            movementPattern: Math.floor(Math.random() * 3),\n            patternOffset: Math.random() * Math.PI * 2\n        });\n    }\n}\n\nfunction updateEnemies() {\n    enemies = enemies.filter(enemy => {\n        enemy.rotation += enemy.rotationSpeed;\n        \n        // Different movement patterns\n        switch(enemy.movementPattern) {\n            case 0: // Straight down\n                enemy.y += enemy.speed;\n                break;\n            case 1: // Sine wave\n                enemy.y += enemy.speed;\n                enemy.x += Math.sin((enemy.y + enemy.patternOffset) * 0.05) * 2;\n                break;\n            case 2: // Circular\n                enemy.y += enemy.speed * 0.7;\n                enemy.x += Math.cos((enemy.y + enemy.patternOffset) * 0.05) * 3;\n                break;\n        }\n        \n        if (!ship.invulnerable && \n            enemy.x < ship.x + ship.width &&\n            enemy.x + enemy.width > ship.x &&\n            enemy.y < ship.y + ship.height &&\n            enemy.y + enemy.height > ship.y) {\n            lives--;\n            livesElement.textContent = lives;\n            ship.invulnerable = true;\n            ship.invulnerabilityTimer = 60;\n            \n            if (lives <= 0) {\n                gameRunning = false;\n                gameOverElement.style.display = 'block';\n                finalScoreElement.textContent = `Final Score: ${score}`;\n            }\n            return false;\n        }\n        \n        return enemy.y < canvas.height;\n    });\n}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Space Blaster</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameCanvas {
+            border: 2px solid #fff;
+        }
+        #score, #lives, #powerups {
+            position: absolute;
+            color: white;
+            font-size: 24px;
+        }
+        #score { top: 20px; left: 20px; }
+        #lives { top: 20px; right: 20px; }
+        #powerups { top: 60px; right: 20px; }
+        #gameOver {
+            position: absolute;
+            color: white;
+            font-size: 48px;
+            text-align: center;
+            display: none;
+        }
+        #gameOver button {
+            font-size: 24px;
+            padding: 10px 20px;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">Score: <span id="scoreValue">0</span></div>
+    <div id="lives">Lives: <span id="livesValue">3</span></div>
+    <div id="powerups"></div>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p id="finalScore"></p>
+        <button onclick="restartGame()">Play Again</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreValue');
+        const livesElement = document.getElementById('livesValue');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
+        const powerupsElement = document.getElementById('powerups');
+
+        // Game state
+        let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        let particles = [];
+        let powerups = [];
+
+        // Particle system
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = Math.random() * 3 + 2;
+                this.speedX = (Math.random() - 0.5) * 8;
+                this.speedY = (Math.random() - 0.5) * 8;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.02;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= this.decay;
+                this.speedX *= 0.99;
+                this.speedY *= 0.99;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color}, ${this.life})`;
+                ctx.fill();
+            }
+        }
+
+        // Power-up types
+        const powerUpTypes = [
+            {
+                type: 'multishot',
+                color: '#FFD700',
+                duration: 300,
+                draw: (x, y) => {
+                    ctx.beginPath();
+                    ctx.arc(x + 15, y + 15, 15, 0, Math.PI * 2);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.fillText('M', x + 15, y + 20);
+                }
+            },
+            {
+                type: 'shield',
+                color: '#4169E1',
+                duration: 300,
+                draw: (x, y) => {
+                    ctx.beginPath();
+                    ctx.arc(x + 15, y + 15, 15, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4169E1';
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.fillText('S', x + 15, y + 20);
+                }
+            }
+        ];
+
+        // Ship with power-ups
+        let ship = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 50,
+            width: 50,
+            height: 30,
+            speed: 5,
+            invulnerable: false,
+            invulnerabilityTimer: 0,
+            powerups: []
+        };
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function spawnPowerUp() {
+            if (Math.random() < 0.005 && gameRunning) {
+                const type = powerUpTypes[Math.floor(Math.random() * powerUpTypes.length)];
+                powerups.push({
+                    x: Math.random() * (canvas.width - 30),
+                    y: 0,
+                    width: 30,
+                    height: 30,
+                    speed: 2,
+                    type: type
+                });
+            }
+        }
+
+        function updatePowerUps() {
+            // Update existing power-ups
+            powerups = powerups.filter(powerup => {
+                powerup.y += powerup.speed;
+                
+                // Check collision with ship
+                if (powerup.x < ship.x + ship.width &&
+                    powerup.x + powerup.width > ship.x &&
+                    powerup.y < ship.y + ship.height &&
+                    powerup.y + powerup.height > ship.y) {
+                    ship.powerups.push({
+                        type: powerup.type,
+                        duration: powerup.type.duration
+                    });
+                    createExplosion(powerup.x + powerup.width/2, powerup.y + powerup.height/2, '255, 215, 0');
+                    return false;
+                }
+                
+                return powerup.y < canvas.height;
+            });
+
+            // Update ship's active power-ups
+            ship.powerups = ship.powerups.filter(powerup => {
+                powerup.duration--;
+                return powerup.duration > 0;
+            });
+        }
+
+        function hasActivePowerUp(type) {
+            return ship.powerups.some(p => p.type.type === type);
+        }
+
+        // Update particle system
+        function updateParticles() {
+            particles = particles.filter(particle => {
+                particle.update();
+                return particle.life > 0;
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach(particle => particle.draw());
+        }
+
+        // Modify the original game loop to include new features
+        function gameLoop() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameRunning) {
+                spawnPowerUp();
+                updatePowerUps();
+                updateParticles();
+            }
+
+            // Draw everything
+            drawParticles();
+            
+            // Draw power-ups
+            powerups.forEach(powerup => {
+                powerup.type.draw(powerup.x, powerup.y);
+            });
+
+            if (ship.invulnerable) {
+                ship.invulnerabilityTimer--;
+                if (ship.invulnerabilityTimer <= 0) {
+                    ship.invulnerable = false;
+                }
+            }
+
+            // Draw ship with shield effect if active
+            if (hasActivePowerUp('shield')) {
+                ctx.beginPath();
+                ctx.arc(ship.x + ship.width/2, ship.y + ship.height/2, 
+                    Math.max(ship.width, ship.height) * 0.7, 0, Math.PI * 2);
+                ctx.strokeStyle = '#4169E1';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
