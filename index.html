@@ -11,45 +11,91 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            font-family: Arial, sans-serif;
         }
         #gameCanvas {
             border: 2px solid #fff;
         }
-        #score {
+        #score, #lives {
             position: absolute;
+            color: white;
+            font-size: 24px;
+        }
+        #score {
             top: 20px;
             left: 20px;
+        }
+        #lives {
+            top: 20px;
+            right: 20px;
+        }
+        #gameOver {
+            position: absolute;
             color: white;
-            font-family: Arial, sans-serif;
+            font-size: 48px;
+            text-align: center;
+            display: none;
+        }
+        #gameOver button {
             font-size: 24px;
+            padding: 10px 20px;
+            margin-top: 20px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div id="score">Score: <span id="scoreValue">0</span></div>
+    <div id="lives">Lives: <span id="livesValue">3</span></div>
+    <div id="gameOver">
+        <h2>Game Over!</h2>
+        <p id="finalScore"></p>
+        <button onclick="restartGame()">Play Again</button>
+    </div>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('scoreValue');
+        const livesElement = document.getElementById('livesValue');
+        const gameOverElement = document.getElementById('gameOver');
+        const finalScoreElement = document.getElementById('finalScore');
         
         let score = 0;
+        let lives = 3;
+        let gameRunning = true;
+        
         let ship = {
             x: canvas.width / 2,
             y: canvas.height - 50,
             width: 50,
             height: 30,
-            speed: 5
+            speed: 5,
+            invulnerable: false,
+            invulnerabilityTimer: 0
         };
         
         let bullets = [];
         let enemies = [];
         let keys = {};
         
+        function restartGame() {
+            score = 0;
+            lives = 3;
+            gameRunning = true;
+            ship.x = canvas.width / 2;
+            ship.y = canvas.height - 50;
+            enemies = [];
+            bullets = [];
+            scoreElement.textContent = score;
+            livesElement.textContent = lives;
+            gameOverElement.style.display = 'none';
+        }
+        
         document.addEventListener('keydown', (e) => keys[e.key] = true);
         document.addEventListener('keyup', (e) => keys[e.key] = false);
         document.addEventListener('keypress', (e) => {
-            if (e.key === ' ') {
+            if (e.key === ' ' && gameRunning) {
                 bullets.push({
                     x: ship.x + ship.width / 2,
                     y: ship.y,
@@ -61,7 +107,7 @@
         });
         
         function spawnEnemy() {
-            if (Math.random() < 0.02) {
+            if (Math.random() < 0.02 && gameRunning) {
                 enemies.push({
                     x: Math.random() * (canvas.width - 30),
                     y: 0,
@@ -73,6 +119,7 @@
         }
         
         function moveShip() {
+            if (!gameRunning) return;
             if (keys['ArrowLeft'] && ship.x > 0) ship.x -= ship.speed;
             if (keys['ArrowRight'] && ship.x < canvas.width - ship.width) ship.x += ship.speed;
         }
@@ -87,6 +134,26 @@
         function updateEnemies() {
             enemies = enemies.filter(enemy => {
                 enemy.y += enemy.speed;
+                
+                // Check for collision with ship
+                if (!ship.invulnerable && 
+                    enemy.x < ship.x + ship.width &&
+                    enemy.x + enemy.width > ship.x &&
+                    enemy.y < ship.y + ship.height &&
+                    enemy.y + enemy.height > ship.y) {
+                    lives--;
+                    livesElement.textContent = lives;
+                    ship.invulnerable = true;
+                    ship.invulnerabilityTimer = 60;
+                    
+                    if (lives <= 0) {
+                        gameRunning = false;
+                        gameOverElement.style.display = 'block';
+                        finalScoreElement.textContent = `Final Score: ${score}`;
+                    }
+                    return false;
+                }
+                
                 return enemy.y < canvas.height;
             });
         }
@@ -112,7 +179,7 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             // Draw ship
-            ctx.fillStyle = '#0f0';
+            ctx.fillStyle = ship.invulnerable ? '#555' : '#0f0';
             ctx.fillRect(ship.x, ship.y, ship.width, ship.height);
             
             // Draw bullets
@@ -129,6 +196,13 @@
         }
         
         function gameLoop() {
+            if (ship.invulnerable) {
+                ship.invulnerabilityTimer--;
+                if (ship.invulnerabilityTimer <= 0) {
+                    ship.invulnerable = false;
+                }
+            }
+            
             moveShip();
             updateBullets();
             spawnEnemy();
